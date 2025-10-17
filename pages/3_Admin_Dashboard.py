@@ -42,7 +42,7 @@ st.write("Modern white-glass UI — Manage job postings, applications, archive/r
 if st.button("Logout"):
     # Only remove the user entry to avoid wiping unrelated session items other pages might use.
     st.session_state.pop("user", None)
-    st.experimental_rerun()
+    st.rerun()
 # ===== CREATE JOB =====
 with st.expander("Create Job Posting", expanded=True):
     col1, col2 = st.columns(2)
