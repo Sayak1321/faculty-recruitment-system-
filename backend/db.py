@@ -28,7 +28,8 @@ def init_db():
     """
     Initialize database schema. Safe to call multiple times.
     Also normalizes any stored role values to lowercase/trimmed so access checks
-    are consistent across the app.
+    are consistent across the app. Also creates a simple settings table for
+    admin-managed secrets and other small key/value settings.
     """
     conn = get_conn()
     cur = conn.cursor()
@@ -89,7 +90,6 @@ def init_db():
     """)
 
     # users table (single definition, using otp_hash for secure OTP storage)
-    # role CHECK ensures allowed values, but we'll normalize roles before insert to be safe.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +107,15 @@ def init_db():
         oauth_provider TEXT,
         oauth_sub TEXT,
         created_at TEXT
+    )
+    """)
+
+    # settings table (small key/value store for admin-managed secrets and flags)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TEXT
     )
     """)
 
@@ -441,4 +450,38 @@ def verify_user_otp_and_mark(user_id, otp_plain):
 def set_user_password(user_id, password_hash):
     conn = get_conn(); cur = conn.cursor()
     cur.execute("UPDATE users SET password_hash=? WHERE id=?", (password_hash, user_id))
+    conn.commit(); conn.close()
+
+
+# ----------------------------
+# Settings helpers (key/value)
+# ----------------------------
+def set_setting(key, value):
+    """
+    Insert or update a setting. value should be string (or None to remove).
+    """
+    conn = get_conn(); cur = conn.cursor()
+    now = datetime.utcnow().isoformat()
+    if value is None:
+        cur.execute("DELETE FROM settings WHERE key=?", (key,))
+    else:
+        # upsert
+        cur.execute("""
+            INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+        """, (key, value, now))
+    conn.commit(); conn.close()
+
+
+def get_setting(key):
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute("SELECT value FROM settings WHERE key=?", (key,))
+    r = cur.fetchone()
+    conn.close()
+    return r['value'] if r else None
+
+
+def delete_setting(key):
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute("DELETE FROM settings WHERE key=?", (key,))
     conn.commit(); conn.close()

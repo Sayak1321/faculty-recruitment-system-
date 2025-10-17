@@ -1,125 +1,30 @@
+# pages/1_Register.py
 import streamlit as st
 import bcrypt
 import os
 from backend import db
 from ui import layout
 
-st.set_page_config(page_title="Hire grounds — Register", page_icon="📝")
+st.set_page_config(page_title="Hire grounds — Register")
 db.init_db()
 layout.header("Hire grounds")
 
 DEPARTMENTS = ["CSE", "ECE", "EE", "ME", "CE", "IT", "Administration"]
 
-# Load admin/panel secret codes
+# Load admin/panel secret codes:
+# Priority: admin-managed hashed secret (DB) -> st.secrets/env fallback
+panel_secret_hash = None
 try:
-    ADMIN_SECRET = st.secrets["app"].get("admin_secret_code")
-    PANEL_SECRET = st.secrets["app"].get("panel_secret_code")
+    panel_secret_hash = db.get_setting("panel_secret_hash")
 except Exception:
-    ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "admin")
-    PANEL_SECRET = os.environ.get("PANEL_SECRET", "panel")
+    panel_secret_hash = None
 
-# --- Vibrant Styles ---
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+# Fallback env/st.secrets (legacy)
+try:
+    LEGACY_PANEL_SECRET = st.secrets["app"].get("panel_secret_code")
+except Exception:
+    LEGACY_PANEL_SECRET = os.environ.get("PANEL_SECRET", "panel")
 
-html, body, [class*="css"] {
-    font-family: 'Poppins', sans-serif !important;
-}
-
-.hg-card {
-    background: linear-gradient(145deg, rgba(35,83,71,0.85) 0%, rgba(138,182,155,0.18) 100%);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px;
-    padding: 48px 40px;
-    box-shadow: 0 0 60px rgba(0,230,168,0.12);
-    transition: all 0.3s ease;
-}
-.hg-card:hover {
-    box-shadow: 0 0 80px rgba(0,230,168,0.2);
-}
-
-h3, .stMarkdown h3 {
-    text-align: center;
-    background: linear-gradient(90deg, #8EB69B, #00E6A8, #DAF1DE);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 700;
-    font-size: 1.8rem;
-    margin-bottom: 0.5rem;
-}
-
-.muted-small {
-    text-align: center;
-    color: rgba(234,246,242,0.7);
-    margin-bottom: 1.5rem;
-    font-size: 0.95rem;
-}
-
-/* Inputs */
-.stTextInput > div > div > input {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    color: #EAF6F2 !important;
-}
-.stTextInput > div > div > input:focus {
-    border-color: #00E6A8 !important;
-    box-shadow: 0 0 6px rgba(0,230,168,0.4);
-}
-
-/* Selectboxes */
-.stSelectbox > div > div {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    color: #EAF6F2 !important;
-}
-.stSelectbox > div > div:focus {
-    border-color: #00E6A8 !important;
-    box-shadow: 0 0 6px rgba(0,230,168,0.4);
-}
-
-/* Buttons */
-div[data-testid="stFormSubmitButton"] > button, 
-div[data-testid="stButton"] > button {
-    background: linear-gradient(90deg, #00E6A8, #8EB69B, #DAF1DE);
-    color: #03201F !important;
-    border: none;
-    font-weight: 700;
-    border-radius: 10px;
-    padding: 0.6rem 1.2rem;
-    transition: all 0.3s ease-in-out;
-    width: 100%;
-    box-shadow: 0 8px 24px rgba(0,230,168,0.25);
-}
-div[data-testid="stFormSubmitButton"] > button:hover,
-div[data-testid="stButton"] > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 28px rgba(0,230,168,0.35);
-}
-
-/* Progress bar (password strength) */
-div[data-testid="stProgressBar"] > div > div {
-    background: linear-gradient(90deg, #8EB69B, #00E6A8);
-    border-radius: 10px;
-}
-
-/* Messages */
-.stSuccess {
-    background: linear-gradient(90deg, rgba(0,230,168,0.15), rgba(138,182,155,0.05));
-    border-radius: 10px;
-    border-left: 4px solid #00E6A8;
-}
-.stError {
-    background: rgba(255, 0, 0, 0.08);
-    border-left: 4px solid #FF4B4B;
-    border-radius: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# --- Registration Form ---
 st.markdown('<div class="hg-card" style="max-width:760px; margin:auto;">', unsafe_allow_html=True)
 st.markdown("### 📝 Register")
 st.markdown("<div class='muted-small'>Create an account to apply or evaluate candidates.</div>", unsafe_allow_html=True)
@@ -134,7 +39,7 @@ with st.form("reg_form"):
     pwd = st.text_input("Password", type="password")
     pwd2 = st.text_input("Confirm Password", type="password")
 
-    # Password strength indicator
+    # password strength - simple heuristic
     def password_strength(p):
         score = 0
         if len(p) >= 8: score += 30
@@ -148,7 +53,9 @@ with st.form("reg_form"):
     st.markdown("<div style='margin-top:6px;'>Password strength</div>", unsafe_allow_html=True)
     st.progress(strength / 100.0)
 
-    admin_code = panel_code = ""
+    # show secret code field conditionally
+    admin_code = ""
+    panel_code = ""
     if role_choice == "admin":
         admin_code = st.text_input("Admin Secret (required to register as admin)", type="password")
     elif role_choice == "panel":
@@ -157,6 +64,7 @@ with st.form("reg_form"):
     submitted = st.form_submit_button("Register")
 
     if submitted:
+        # basic validation
         if not full_name or not email or not username or not pwd:
             st.error("Please fill required fields.")
         elif pwd != pwd2:
@@ -164,18 +72,39 @@ with st.form("reg_form"):
         elif strength < 50:
             st.error("Choose a stronger password (use mix of letters, numbers and special chars).")
         else:
+            # uniqueness checks
             if db.get_user_by_username(username):
                 st.error("Username already taken. Choose another.")
             elif db.get_user_by_email(email):
                 st.error("An account with this email already exists.")
             else:
-                if role_choice == "admin" and admin_code != ADMIN_SECRET:
-                    st.error("Invalid admin secret code. You cannot register as admin.")
-                    st.stop()
-                if role_choice == "panel" and panel_code != PANEL_SECRET:
-                    st.error("Invalid panel secret code. You cannot register as panel member.")
-                    st.stop()
+                # role-specific secret checks
+                if role_choice == "admin":
+                    # still use env/st.secrets for admin secret (or you can add admin-managed secret similarly)
+                    try:
+                        ADMIN_SECRET = st.secrets["app"].get("admin_secret_code")
+                    except Exception:
+                        ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "admin")
+                    if admin_code != ADMIN_SECRET:
+                        st.error("Invalid admin secret code. You cannot register as admin.")
+                        st.stop()
+                if role_choice == "panel":
+                    # If admin-managed hash exists, verify against it; otherwise fallback to legacy secret
+                    if panel_secret_hash:
+                        try:
+                            ok = bcrypt.checkpw(panel_code.encode(), panel_secret_hash.encode())
+                        except Exception:
+                            ok = False
+                        if not ok:
+                            st.error("Invalid panel secret code. You cannot register as panel member.")
+                            st.stop()
+                    else:
+                        # fallback: legacy environment secret
+                        if panel_code != LEGACY_PANEL_SECRET:
+                            st.error("Invalid panel secret code. You cannot register as panel member.")
+                            st.stop()
 
+                # create user (simple flow: no OTP, mark email verified)
                 try:
                     password_hash = bcrypt.hashpw(pwd.encode(), bcrypt.gensalt()).decode()
                     uid = db.create_user(
@@ -191,13 +120,13 @@ with st.form("reg_form"):
                 except Exception as e:
                     st.error(f"Registration failed: {e}")
                 else:
+                    # fetch created user and log them in
                     user = db.get_user_by_username(username)
                     if user:
                         st.session_state["user"] = user
                         st.success(f"Registered and logged in successfully as {role_choice}.")
                         st.experimental_rerun()
                     else:
-                        st.info("Registered. Please login from the Login page.")
-
+                        st.info("Registered. Please login from Login page.")
 st.markdown("</div>", unsafe_allow_html=True)
 layout.footer()
