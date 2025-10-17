@@ -2,9 +2,11 @@ import streamlit as st
 import bcrypt
 import os
 from backend import db
-from datetime import datetime
+from ui import layout
 
-st.set_page_config(page_title="Register")
+st.set_page_config(page_title="Hire grounds — Register")
+db.init_db()
+layout.header("Hire grounds")
 
 DEPARTMENTS = ["CSE", "ECE", "EE", "ME", "CE", "IT", "Administration"]
 
@@ -16,7 +18,9 @@ except Exception:
     ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "admin")
     PANEL_SECRET = os.environ.get("PANEL_SECRET", "panel")
 
-st.markdown("<h2>Register</h2>", unsafe_allow_html=True)
+st.markdown('<div class="hg-card" style="max-width:760px; margin:auto;">', unsafe_allow_html=True)
+st.markdown("### 📝 Register")
+st.markdown("<div class='muted-small'>Create an account to apply or evaluate candidates.</div>", unsafe_allow_html=True)
 
 with st.form("reg_form"):
     full_name = st.text_input("Full Name")
@@ -27,6 +31,20 @@ with st.form("reg_form"):
     mobile = st.text_input("Mobile Number (optional)")
     pwd = st.text_input("Password", type="password")
     pwd2 = st.text_input("Confirm Password", type="password")
+
+    # password strength - simple heuristic
+    def password_strength(p):
+        score = 0
+        if len(p) >= 8: score += 30
+        if any(c.islower() for c in p): score += 10
+        if any(c.isupper() for c in p): score += 15
+        if any(c.isdigit() for c in p): score += 15
+        if any(c in "!@#$%^&*()-_=+[]{};:,.<>?/" for c in p): score += 30
+        return min(100, score)
+
+    strength = password_strength(pwd or "")
+    st.markdown("<div style='margin-top:6px;'>Password strength</div>", unsafe_allow_html=True)
+    st.progress(strength / 100.0)
 
     # show secret code field conditionally
     admin_code = ""
@@ -44,6 +62,8 @@ with st.form("reg_form"):
             st.error("Please fill required fields.")
         elif pwd != pwd2:
             st.error("Passwords do not match.")
+        elif strength < 50:
+            st.error("Choose a stronger password (use mix of letters, numbers and special chars).")
         else:
             # uniqueness checks
             if db.get_user_by_username(username):
@@ -82,15 +102,8 @@ with st.form("reg_form"):
                     if user:
                         st.session_state["user"] = user
                         st.success(f"Registered and logged in successfully as {role_choice}.")
-                        # redirect based on role
-                        if role_choice == "admin":
-                            st.rerun()  # top-of-page redirect logic will switch
-                            # alternatively: st.switch_page("pages/3_Admin_Dashboard.py")
-                        elif role_choice == "panel":
-                            st.rerun()
-                            # alternatively: st.switch_page("pages/5_Panel_Dashboard.py")
-                        else:
-                            st.rerun()
-                            # alternatively: st.switch_page("pages/4_Candidate_Dashboard.py")
+                        st.experimental_rerun()
                     else:
                         st.info("Registered. Please login from Login page.")
+st.markdown("</div>", unsafe_allow_html=True)
+layout.footer()
