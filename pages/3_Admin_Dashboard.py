@@ -380,7 +380,18 @@ with colr1:
 with colr2:
     if sel_report and sel_report != "-- select --":
         jr = int(sel_report.split(" - ")[0])
-        if st.button("Generate Job PDF Report"):
-            path = report_generator.generate_pdf_report(jr)
-            st.success(f"Report generated: {path}")
-            st.markdown(f"[Download report]({path})")
+        # Replace the old "Generate PDF" block with this snippet (paste inside the same place where the old block was)
+if st.button("Generate PDF", key=f"pdf_{a['id']}"):
+    fpath = report_generator.generate_candidate_pdf(a['id'])
+    # Validate the created file and offer it as a download
+    if fpath and os.path.exists(fpath):
+        st.success(f"Candidate PDF created: {fpath}")
+        with open(fpath, "rb") as fh:
+            st.download_button(
+                label="Download PDF",
+                data=fh.read(),
+                file_name=os.path.basename(fpath),
+                mime="application/pdf",
+            )
+    else:
+        st.error("Failed to create PDF or file not found.")
