@@ -7,13 +7,17 @@ import mimetypes
 st.set_page_config(page_title="Panel Evaluation")
 db.init_db()
 
-# --- ACCESS CONTROL: allow panelists and admins ---
-if "user" not in st.session_state or not st.session_state["user"] or st.session_state["user"].get("role") not in ("panel", "admin"):
+# --- ACCESS CONTROL: allow panelists and admins (case-insensitive) ---
+user = st.session_state.get("user")
+role = (user.get("role") if user else "") or ""
+role = role.lower().strip()
+
+if not user or role not in ("panel", "admin"):
     st.error("Access denied. Please log in as Panel member.")
     st.stop()
 
 st.title("Panel Evaluation Portal")
-st.write(f"Welcome, {st.session_state['user'].get('full_name','Panelist')}")
+st.write(f"Welcome, {user.get('full_name','Panelist')}")
 
 # Logout: clear user and redirect to Home
 if st.button("Logout"):
@@ -66,6 +70,6 @@ if job_id:
                 if submit:
                     scores = {"teaching": teaching, "research": research, "communication": communication, "fit": fit}
                     # Fall back to panelist input or the logged-in user's name
-                    panel_name = (panelist.strip() or st.session_state['user'].get('full_name', 'Anonymous'))
+                    panel_name = (panelist.strip() or user.get('full_name', 'Anonymous'))
                     db.insert_evaluation(a.get('id'), panel_name, scores, comments)
                     st.success("Evaluation saved")

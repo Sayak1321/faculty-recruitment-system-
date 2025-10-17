@@ -6,7 +6,7 @@ st.set_page_config(page_title="Login", page_icon="🔐")
 
 # --- Redirect if already logged in ---
 if "user" in st.session_state and st.session_state["user"]:
-    role = st.session_state["user"].get("role", "candidate")
+    role = (st.session_state["user"].get("role") or "candidate").lower()
     if role == "admin":
         st.switch_page("pages/3_Admin_Dashboard.py")
     elif role == "panel":
@@ -23,6 +23,7 @@ if st.button("Login"):
     if not username_or_email or not password:
         st.error("Enter username/email and password.")
     else:
+        # try username first, then email
         user = db.get_user_by_username(username_or_email) or db.get_user_by_email(username_or_email)
         if not user:
             st.error("Invalid username or password.")
@@ -37,7 +38,16 @@ if st.button("Login"):
                 if not user.get("is_active", 1):
                     st.error("Account is deactivated. Contact admin.")
                 else:
-                    # login success
+                    # Normalize role value to lower-case to avoid case-sensitivity issues
+                    role_raw = user.get("role") or "candidate"
+                    user["role"] = role_raw.lower().strip()
+                    # Save normalized user into session
                     st.session_state["user"] = user
                     st.success(f"Welcome, {user.get('full_name','User')}!")
-                    st.rerun()
+                    # Redirect by role
+                    if user["role"] == "admin":
+                        st.experimental_rerun()
+                    elif user["role"] == "panel":
+                        st.experimental_rerun()
+                    else:
+                        st.experimental_rerun()
