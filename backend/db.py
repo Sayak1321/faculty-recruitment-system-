@@ -27,6 +27,8 @@ def get_conn():
 def init_db():
     """
     Initialize database schema. Safe to call multiple times.
+    Also normalizes any stored role values to lowercase/trimmed so access checks
+    are consistent across the app.
     """
     conn = get_conn()
     cur = conn.cursor()
@@ -87,6 +89,7 @@ def init_db():
     """)
 
     # users table (single definition, using otp_hash for secure OTP storage)
+    # role CHECK ensures allowed values, but we'll normalize roles before insert to be safe.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,6 +111,14 @@ def init_db():
     """)
 
     conn.commit()
+
+    # Normalize any pre-existing role values to lowercase/trim
+    try:
+        cur.execute("UPDATE users SET role = LOWER(TRIM(role)) WHERE role IS NOT NULL")
+        conn.commit()
+    except Exception:
+        # if anything goes wrong with normalization, ignore to avoid blocking init
+        pass
 
     # create default admin if none exists
     cur.execute("SELECT COUNT(*) as c FROM users WHERE role='admin'")
@@ -350,29 +361,47 @@ def insert_report(job_id, file_path):
 # Users & Authentication helpers
 # ----------------------------
 def create_user(full_name, department, username, email, mobile, password_hash, role="candidate", is_email_verified=0):
+    """
+    Create a user while normalizing role to lowercase and trimming whitespace.
+    Validate role against allowed roles to avoid DB CHECK failures.
+    """
+    # normalize role
+    safe_role = (role or "candidate").lower().strip()
+    if safe_role not in ("admin", "candidate", "panel"):
+        safe_role = "candidate"
+
     conn = get_conn(); cur = conn.cursor()
     cur.execute("""INSERT INTO users
                    (full_name, department, username, email, mobile, password_hash, role, is_email_verified, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (full_name, department, username, email, mobile, password_hash, role, int(is_email_verified), datetime.utcnow().isoformat()))
+                (full_name, department, username, email, mobile, password_hash, safe_role, int(is_email_verified), datetime.utcnow().isoformat()))
     conn.commit()
     uid = cur.lastrowid
     conn.close()
     return uid
 
 
+def _normalize_user_row(row):
+    """Helper to normalize returned user row dict (role lowercased and trimmed)."""
+    if not row:
+        return None
+    d = dict(row)
+    d['role'] = (d.get('role') or 'candidate').lower().strip()
+    return d
+
+
 def get_user_by_username(username):
     conn = get_conn(); cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE username=?", (username,))
     r = cur.fetchone(); conn.close()
-    return dict(r) if r else None
+    return _normalize_user_row(r)
 
 
 def get_user_by_email(email):
     conn = get_conn(); cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE email=?", (email,))
     r = cur.fetchone(); conn.close()
-    return dict(r) if r else None
+    return _normalize_user_row(r)
 
 
 def update_user_otp(user_id, otp_hash, expires_at_iso):

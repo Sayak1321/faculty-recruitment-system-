@@ -46,8 +46,8 @@ if st.button("Login"):
                     st.success(f"Welcome, {user.get('full_name','User')}!")
                     # Redirect by role
                     if user["role"] == "admin":
-                        st.experimental_rerun()
+                        st.rerun()
                     elif user["role"] == "panel":
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
-                        st.experimental_rerun()
+                        st.rerun()
