@@ -3,28 +3,22 @@ import streamlit as st
 from backend import db, resume_parser, eligibility, scoring
 import os, json, time
 
-# Access control
-if "user" not in st.session_state or st.session_state["user"]["role"] != "admin":
-    st.error("Access denied. Please log in as Admin.")
-    st.stop()
-
-st.title("🧭 Admin Dashboard")
-st.write("Welcome, Admin!")
-
-if "logged_in" not in st.session_state or not st.session_state.logged_in:
-    st.error("Please login first.")
-    st.stop()
-
-if st.session_state.role != "admin":
-    st.error("Access denied: admin only.")
-    st.stop()
-
-
-
-
 st.set_page_config(page_title="Candidate Portal")
 db.init_db()
+
+# --- ACCESS CONTROL: allow only candidates (prevent admin-only check that blocked candidates) ---
+if "user" not in st.session_state or not st.session_state["user"] or st.session_state["user"].get("role") != "candidate":
+    st.error("Access denied. Please log in as Candidate.")
+    st.stop()
+
 st.title("Candidate Portal - Apply for Jobs")
+st.write(f"Welcome, {st.session_state['user'].get('full_name','Candidate')}")
+
+# Logout: clear user and redirect to Home
+if st.button("Logout"):
+    st.session_state.pop("user", None)
+    st.success("Logged out. Redirecting to Home...")
+    st.switch_page("pages/0_Home.py")
 
 st.subheader("📌 Available Job Openings")
 jobs = db.get_active_jobs()

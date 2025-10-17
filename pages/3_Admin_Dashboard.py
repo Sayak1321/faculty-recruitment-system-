@@ -8,31 +8,14 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
-# Access control
-if "user" not in st.session_state or st.session_state["user"]["role"] != "admin":
-    st.error("Access denied. Please log in as Admin.")
-    st.stop()
-
-st.title("🧭 Admin Dashboard")
-st.write("Welcome, Admin!")
-
-if "logged_in" not in st.session_state or not st.session_state.logged_in:
-    st.error("Please login first.")
-    st.stop()
-
-if st.session_state.role != "admin":
-    st.error("Access denied: admin only.")
-    st.stop()
-
-
-if st.button("Logout"):
-    st.session_state.clear()
-    st.experimental_rerun()
-
 
 st.set_page_config(page_title="Admin Dashboard", layout="wide")
+# --- Initialize Database ---
 db.init_db()
 
+if "user" not in st.session_state or not st.session_state["user"] or st.session_state["user"].get("role") != "admin":
+    st.error("Access denied. Please log in as Admin.")
+    st.stop()
 # --- CSS: Modern white glass + subtle hover/animation ---
 st.markdown(
     """
@@ -56,6 +39,10 @@ st.markdown(
 st.title("Admin Dashboard — Manage Jobs & Applications")
 st.write("Modern white-glass UI — Manage job postings, applications, archive/restore and generate reports.")
 
+if st.button("Logout"):
+    # Only remove the user entry to avoid wiping unrelated session items other pages might use.
+    st.session_state.pop("user", None)
+    st.experimental_rerun()
 # ===== CREATE JOB =====
 with st.expander("Create Job Posting", expanded=True):
     col1, col2 = st.columns(2)
