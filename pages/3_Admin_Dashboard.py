@@ -41,7 +41,7 @@ st.title("Admin Dashboard — Manage Jobs & Applications")
 
 if st.button("Logout"):
     st.session_state.pop("user", None)
-    st.experimental_rerun()
+    st.rerun()
 
 # ======================================================
 # CREATE JOB SECTION
