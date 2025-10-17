@@ -27,7 +27,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("<br/>")
+st.markdown("")
 
 # Features (3 columns)
 col1, col2, col3 = st.columns(3, gap="large")
@@ -47,7 +47,7 @@ with col3:
     st.markdown("<div class='muted-small'>Panel scoring, comments and downloadable reports for transparency.</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<br/>")
+st.markdown("")
 
 # Quick stats (jobs, applicants, shortlisted)
 try:
